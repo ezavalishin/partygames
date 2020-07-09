@@ -1,0 +1,14 @@
+# Ignore VSCode workspace config files
+.vscode
+.history
+.idea/
+
+# Never commit the ENV file
+.env
+
+# MacOS temp files
+.DS_Store
+
+# build/ folder should be present, but the contents not, just .keep this one
+build/*
+!build/.keep
