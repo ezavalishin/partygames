@@ -35,9 +35,10 @@ func Run(orm *orm.ORM) {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
+		AllowMethods:     []string{"GET", "POST"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Vk-Params"},
 		AllowCredentials: false,
+		AllowAllOrigins: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
