@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/ezavalishin/partygames/internal/auth"
 	"github.com/ezavalishin/partygames/internal/orm"
+	"github.com/ezavalishin/partygames/pkg/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -11,6 +12,6 @@ func CurrentUser(orm *orm.ORM) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		user := auth.ForContext(context.Request.Context())
 
-		context.JSON(http.StatusOK, user)
+		context.JSON(http.StatusOK, utils.WrapJSON(user))
 	}
 }
