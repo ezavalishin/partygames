@@ -1,4 +1,4 @@
-package games
+package handlers
 
 import (
 	//"github.com/ezavalishin/partygames/internal/auth"

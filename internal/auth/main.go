@@ -10,10 +10,15 @@ import (
 	"github.com/ezavalishin/partygames/pkg/utils"
 	"github.com/ezavalishin/partygames/pkg/vk"
 	"github.com/gin-gonic/gin"
+	socketio "github.com/googollee/go-socket.io"
 	"net/http"
 	"net/url"
 	"strconv"
 )
+
+type wssContext struct {
+	user models.User
+}
 
 var userCtxKey = &contextKey{"user"}
 
@@ -29,16 +34,11 @@ func validateAndGetUserID(vkParams string) (int, error) {
 		return 0, err
 	}
 
-	fmt.Printf("%+v\n", utils.MustGet("VK_APP_SECRET"))
-
 	if ok, err := vk.ParamsVerify(string(decoded), utils.MustGet("VK_APP_SECRET")); err != nil || ok != true {
 		return 0, errors.New("bad sign")
 	}
 
 	parsedUrl, err2 := url.ParseQuery(string(decoded))
-
-	fmt.Println("query")
-	fmt.Printf("%+v\n", parsedUrl)
 
 	if err2 != nil {
 		return 0, err2
@@ -58,11 +58,31 @@ func getUserByID(orm *orm.ORM, vkUserId int) models.User {
 	return user
 }
 
+func WsValidateAndSetUser(orm *orm.ORM, s socketio.Conn, vkParams string) error {
+	vkUserId, err := validateAndGetUserID(vkParams)
+
+	if err != nil {
+		return err
+	}
+
+	user := getUserByID(orm, vkUserId)
+
+	s.SetContext(&wssContext{user: user})
+
+	return nil
+}
+
 // Middleware decodes the share session cookie and packs the session into context
 func Middleware(orm *orm.ORM) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		vkParams := c.Request.Header.Get("Vk-Params")
+		var vkParams string
+
+		vkParams = c.Request.Header.Get("Vk-Params")
+
+		if vkParams == "" {
+			vkParams = c.Query("vk-params")
+		}
 
 		if vkParams == "" {
 			http.Error(c.Writer, "Required Vk-Params", http.StatusForbidden)
@@ -71,9 +91,6 @@ func Middleware(orm *orm.ORM) gin.HandlerFunc {
 		}
 
 		vkUserId, err := validateAndGetUserID(vkParams)
-
-		fmt.Println("got vk user id")
-		fmt.Printf("%+v\n", vkUserId)
 
 		if err != nil {
 			http.Error(c.Writer, "", http.StatusForbidden)
@@ -108,4 +125,18 @@ func ForContext(ctx context.Context) *models.User {
 		return nil
 	}
 	return gc
+}
+
+func ForWssContext(s socketio.Conn) *models.User {
+
+	wssC := s.Context().(*wssContext)
+
+	if wssC == nil {
+		fmt.Println("could not retrieve gin.Context")
+		return nil
+	}
+
+	user := wssC.user
+
+	return &user
 }
