@@ -220,7 +220,7 @@ func Run(orm *orm.ORM) {
 	ws := r.Group("/socket.io")
 
 	ws.Use(auth.Middleware(orm))
-	ws.Use(GinMiddleware("http://localhost:3000"))
+	ws.Use(GinMiddleware("*"))
 	{
 		ws.Handle("POST", "/*any", gin.WrapH(server))
 		ws.Handle("GET", "/*any", gin.WrapH(server))
