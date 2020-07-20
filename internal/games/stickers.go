@@ -22,10 +22,11 @@ type StickerGameUser struct {
 }
 
 type ActiveStickerGame struct {
-	Id        uuid.UUID          `json:"id"`
-	Creator   *models.User       `json:"creator"`
-	StartedAt *time.Time         `json:"startedAt"`
-	GameUsers []*StickerGameUser `json:"gameUsers"`
+	Id         uuid.UUID          `json:"id"`
+	Creator    *models.User       `json:"creator"`
+	StartedAt  *time.Time         `json:"startedAt"`
+	FinishedAt *time.Time         `json:"finishedAt"`
+	GameUsers  []*StickerGameUser `json:"gameUsers"`
 }
 
 type SetWord struct {
@@ -171,4 +172,20 @@ func (g *ActiveStickerGame) GotWordForUser(u *models.User) {
 	}
 
 	currentGameUser.IsFinished = true
+
+	g.CheckGameIsFinished()
+}
+
+func (g *ActiveStickerGame) CheckGameIsFinished() {
+
+	finished := true
+
+	for _, gameUser := range g.GameUsers {
+		finished = finished && gameUser.IsFinished
+	}
+
+	if finished {
+		now := time.Now()
+		g.FinishedAt = &now
+	}
 }
