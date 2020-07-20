@@ -59,11 +59,21 @@ func Run(orm *orm.ORM) {
 
 		err := auth.WsValidateAndSetUser(orm, s, vkParams)
 
+		user := auth.ForWssContext(s)
+
+		fmt.Println("CONNECTED " + *user.FirstName + ", " + s.ID())
+
 		if err != nil {
 			return err
 		}
 
 		return nil
+	})
+
+	server.OnDisconnect("/", func(s socketio.Conn, msg string) {
+		user := auth.ForWssContext(s)
+
+		fmt.Println("DISCONNECTED " + *user.FirstName + ", " + s.ID())
 	})
 
 	server.OnEvent("/", "kek", func(s socketio.Conn, msg string) error {
@@ -127,6 +137,21 @@ func Run(orm *orm.ORM) {
 		return nil
 	})
 
+	server.OnEvent("/", "restart-game", func(s socketio.Conn, msg string) error {
+
+		fmt.Println("RESTART")
+
+		user := auth.ForWssContext(s)
+
+		activeGame := games.RestartStickerGame(user, msg)
+
+		server.BroadcastToRoom("/", activeGame.Id.String(), "game-restarted", utils.WrapJSON(activeGame))
+
+		fmt.Println("SENT")
+
+		return nil
+	})
+
 	server.OnEvent("/", "set-word", func(s socketio.Conn, msg string) error {
 
 		fmt.Println("SET WORD")
@@ -154,7 +179,7 @@ func Run(orm *orm.ORM) {
 
 		user := auth.ForWssContext(s)
 
-		activeGame := games.GotWordInGame(user, msg)
+		activeGame := games.GotWordInGame(user, msg, server)
 
 		server.BroadcastToRoom("/", activeGame.Id.String(), "game-updated", utils.WrapJSON(activeGame))
 

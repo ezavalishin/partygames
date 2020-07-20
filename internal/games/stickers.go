@@ -3,7 +3,10 @@ package games
 import (
 	"fmt"
 	"github.com/ezavalishin/partygames/internal/orm/models"
+	"github.com/ezavalishin/partygames/pkg/utils"
 	"github.com/google/uuid"
+	socketio "github.com/googollee/go-socket.io"
+	"math/rand"
 	"time"
 )
 
@@ -79,6 +82,16 @@ func StartStickerGame(authedUser *models.User, id string) ActiveStickerGame {
 	return *activeGame
 }
 
+func RestartStickerGame(authedUser *models.User, id string) ActiveStickerGame {
+
+	activeGame := stickerGames[id]
+
+	activeGame.Clear()
+	activeGame.StartTyping()
+
+	return *activeGame
+}
+
 func SetWordInGame(authedUser *models.User, id string, word string) ActiveStickerGame {
 
 	activeGame := stickerGames[id]
@@ -92,16 +105,22 @@ func SetWordInGame(authedUser *models.User, id string, word string) ActiveSticke
 	return *activeGame
 }
 
-func GotWordInGame(authedUser *models.User, id string) ActiveStickerGame {
+func GotWordInGame(authedUser *models.User, id string, server *socketio.Server) ActiveStickerGame {
 
 	activeGame := stickerGames[id]
 
-	activeGame.GotWordForUser(authedUser)
+	activeGame.GotWordForUser(authedUser, server)
 
 	return *activeGame
 }
 
 func (g *ActiveStickerGame) AddPlayer(p *models.User) {
+
+	for _, gameUser := range g.GameUsers {
+		if gameUser.User.ID == p.ID {
+			return
+		}
+	}
 
 	gameUser := StickerGameUser{
 		User:       p,
@@ -112,11 +131,27 @@ func (g *ActiveStickerGame) AddPlayer(p *models.User) {
 	g.GameUsers = append(g.GameUsers, &gameUser)
 }
 
+func (g *ActiveStickerGame) Clear() {
+
+	g.StartedAt = nil
+	g.FinishedAt = nil
+
+	for _, gameUser := range g.GameUsers {
+		gameUser.Word = nil
+		gameUser.AttachedGameUser = nil
+		gameUser.IsFinished = false
+	}
+}
+
 func (g *ActiveStickerGame) StartTyping() {
 	now := time.Now()
 	g.StartedAt = &now
 
 	len := len(g.GameUsers)
+
+	rand.Seed(time.Now().UnixNano())
+
+	rand.Shuffle(len, func(i, j int) { g.GameUsers[i], g.GameUsers[j] = g.GameUsers[j], g.GameUsers[i] })
 
 	for i, gameUser := range g.GameUsers {
 		index := (i + 1) % len
@@ -157,7 +192,7 @@ func (g *ActiveStickerGame) SetWordForUser(u *models.User, word string) {
 	attachedUser.Word = &word
 }
 
-func (g *ActiveStickerGame) GotWordForUser(u *models.User) {
+func (g *ActiveStickerGame) GotWordForUser(u *models.User, server *socketio.Server) {
 
 	var currentGameUser *StickerGameUser
 
@@ -173,10 +208,10 @@ func (g *ActiveStickerGame) GotWordForUser(u *models.User) {
 
 	currentGameUser.IsFinished = true
 
-	g.CheckGameIsFinished()
+	g.CheckGameIsFinished(server)
 }
 
-func (g *ActiveStickerGame) CheckGameIsFinished() {
+func (g *ActiveStickerGame) CheckGameIsFinished(server *socketio.Server) {
 
 	finished := true
 
@@ -187,5 +222,7 @@ func (g *ActiveStickerGame) CheckGameIsFinished() {
 	if finished {
 		now := time.Now()
 		g.FinishedAt = &now
+
+		server.BroadcastToRoom("/", g.Id.String(), "game-updated", utils.WrapJSON(g))
 	}
 }

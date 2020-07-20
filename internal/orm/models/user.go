@@ -8,17 +8,17 @@ import (
 
 type User struct {
 	BaseModel
-	VkUserId  int `gorm:"NOT NULL" json:"vkUserId"`
-	FirstName *string `json:"firstName"`
-	LastName  *string `json:"lastName"`
-	Avatar    *string `json:"avatar"`
-	NotificationsAreEnabled bool `json:"notificationsAreEnabled"`
-	IsFollower bool `json:"isFollower"`
+	VkUserId                int     `gorm:"NOT NULL" json:"vkUserId"`
+	FirstName               *string `json:"firstName"`
+	LastName                *string `json:"lastName"`
+	Avatar                  *string `json:"avatar"`
+	NotificationsAreEnabled bool    `json:"notificationsAreEnabled"`
+	IsFollower              bool    `json:"isFollower"`
 }
 
 func (u *User) AfterCreate(scope *gorm.Scope) (err error) {
 
-	go fillUserFromVk(u, scope)
+	fillUserFromVk(u, scope)
 
 	return
 }
