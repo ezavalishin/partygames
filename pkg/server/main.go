@@ -61,7 +61,11 @@ func Run(orm *orm.ORM) {
 
 		user := auth.ForWssContext(s)
 
-		fmt.Println("CONNECTED " + *user.FirstName + ", " + s.ID())
+		if user != nil {
+			go games.SetUserIsOnline(user, server)
+
+			fmt.Println("CONNECTED " + *user.FirstName + ", " + s.ID())
+		}
 
 		if err != nil {
 			return err
@@ -73,7 +77,11 @@ func Run(orm *orm.ORM) {
 	server.OnDisconnect("/", func(s socketio.Conn, msg string) {
 		user := auth.ForWssContext(s)
 
-		fmt.Println("DISCONNECTED " + *user.FirstName + ", " + s.ID())
+		if user != nil {
+			go games.SetUserIsOffline(user, server)
+
+			fmt.Println("DISCONNECTED " + *user.FirstName + ", " + s.ID())
+		}
 	})
 
 	server.OnEvent("/", "kek", func(s socketio.Conn, msg string) error {
@@ -188,6 +196,19 @@ func Run(orm *orm.ORM) {
 		return nil
 	})
 
+	server.OnEvent("/", "leave", func(s socketio.Conn, msg string) error {
+
+		fmt.Println("LEAVE")
+
+		user := auth.ForWssContext(s)
+
+		s.Leave(msg)
+
+		games.LeaveFromStickerGame(user, msg, server)
+
+		return nil
+	})
+
 	go server.Serve()
 	defer server.Close()
 
@@ -207,6 +228,7 @@ func Run(orm *orm.ORM) {
 	{
 		authorized.GET("/me", handlers.CurrentUser(orm))
 		authorized.GET("/alias/words", handlers.AliasWords(orm))
+		authorized.GET("/stickers/word", handlers.GetRandomStickerWord(orm))
 	}
 
 	adminized := r.Group("/admin")

@@ -21,6 +21,7 @@ type StickerGameUser struct {
 	User             *models.User      `json:"user"`
 	AttachedGameUser *AttachedGameUser `json:"attachedGameUser"`
 	Word             *string           `json:"word"`
+	IsOnline         bool              `json:"isOnline"`
 	IsFinished       bool              `json:"isFinished"`
 }
 
@@ -35,6 +36,34 @@ type ActiveStickerGame struct {
 type SetWord struct {
 	GameId string `json:"gameId"`
 	Word   string `json:"word"`
+}
+
+func SetUserIsOnline(user *models.User, server *socketio.Server) {
+	for _, stickerGame := range stickerGames {
+
+		for _, gameUser := range stickerGame.GameUsers {
+			if gameUser.User.ID == user.ID && !gameUser.IsOnline {
+
+				gameUser.IsOnline = true
+
+				server.BroadcastToRoom("/", stickerGame.Id.String(), "game-updated", utils.WrapJSON(stickerGame))
+			}
+		}
+	}
+}
+
+func SetUserIsOffline(user *models.User, server *socketio.Server) {
+	for _, stickerGame := range stickerGames {
+
+		for _, gameUser := range stickerGame.GameUsers {
+			if gameUser.User.ID == user.ID && gameUser.IsOnline {
+
+				gameUser.IsOnline = false
+
+				server.BroadcastToRoom("/", stickerGame.Id.String(), "game-updated", utils.WrapJSON(stickerGame))
+			}
+		}
+	}
 }
 
 func CreateStickerGame(authedUser *models.User) ActiveStickerGame {
@@ -92,6 +121,15 @@ func RestartStickerGame(authedUser *models.User, id string) ActiveStickerGame {
 	return *activeGame
 }
 
+func LeaveFromStickerGame(authedUser *models.User, id string, server *socketio.Server) ActiveStickerGame {
+
+	activeGame := stickerGames[id]
+
+	activeGame.RemovePlayer(authedUser, server)
+
+	return *activeGame
+}
+
 func SetWordInGame(authedUser *models.User, id string, word string) ActiveStickerGame {
 
 	activeGame := stickerGames[id]
@@ -126,9 +164,31 @@ func (g *ActiveStickerGame) AddPlayer(p *models.User) {
 		User:       p,
 		Word:       nil,
 		IsFinished: false,
+		IsOnline:   true,
 	}
 
 	g.GameUsers = append(g.GameUsers, &gameUser)
+}
+
+func (g *ActiveStickerGame) RemovePlayer(p *models.User, server *socketio.Server) {
+
+	var currentGameUserIndex *int
+
+	for i, gameUser := range g.GameUsers {
+		if gameUser.User.ID == p.ID {
+			currentGameUserIndex = &i
+		}
+	}
+
+	if currentGameUserIndex == nil {
+		return
+	}
+
+	g.GameUsers = append(g.GameUsers[:*currentGameUserIndex], g.GameUsers[*currentGameUserIndex+1:]...)
+
+	server.BroadcastToRoom("/", g.Id.String(), "game-updated", utils.WrapJSON(g))
+
+	g.CheckGameIsFinished(server)
 }
 
 func (g *ActiveStickerGame) Clear() {
@@ -216,10 +276,15 @@ func (g *ActiveStickerGame) CheckGameIsFinished(server *socketio.Server) {
 	finished := true
 
 	for _, gameUser := range g.GameUsers {
-		finished = finished && gameUser.IsFinished
+		if gameUser.IsOnline {
+			finished = finished && gameUser.IsFinished
+		}
 	}
 
+	fmt.Println("TRY SEND FINISH")
+
 	if finished {
+		fmt.Println("FINISHED")
 		now := time.Now()
 		g.FinishedAt = &now
 
