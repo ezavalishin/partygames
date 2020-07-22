@@ -129,7 +129,11 @@ func ForContext(ctx context.Context) *models.User {
 
 func ForWssContext(s socketio.Conn) *models.User {
 
-	wssC := s.Context().(*wssContext)
+	wssC, ok := s.Context().(*wssContext)
+
+	if !ok {
+		return nil
+	}
 
 	if wssC == nil {
 		fmt.Println("could not retrieve gin.Context")

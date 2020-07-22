@@ -172,19 +172,19 @@ func (g *ActiveStickerGame) AddPlayer(p *models.User) {
 
 func (g *ActiveStickerGame) RemovePlayer(p *models.User, server *socketio.Server) {
 
-	var currentGameUserIndex *int
+	currentGameUserIndex := -1
 
 	for i, gameUser := range g.GameUsers {
 		if gameUser.User.ID == p.ID {
-			currentGameUserIndex = &i
+			currentGameUserIndex = i
 		}
 	}
 
-	if currentGameUserIndex == nil {
+	if currentGameUserIndex == -1 {
 		return
 	}
 
-	g.GameUsers = append(g.GameUsers[:*currentGameUserIndex], g.GameUsers[*currentGameUserIndex+1:]...)
+	g.GameUsers = append(g.GameUsers[:currentGameUserIndex], g.GameUsers[currentGameUserIndex+1:]...)
 
 	server.BroadcastToRoom("/", g.Id.String(), "game-updated", utils.WrapJSON(g))
 

@@ -25,15 +25,15 @@ func init() {
 
 func GinMiddleware(allowOrigin string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, Content-Length, X-CSRF-Token, Token, session, Origin, Host, Connection, Accept-Encoding, Accept-Language, X-Requested-With")
-
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
+		//c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigin)
+		//c.Writer.Header().Set("Access-Control-Allow-Credentials", "false")
+		//c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, WS, WSS")
+		//c.Writer.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Origin, Host, Connection, Accept-Encoding, Accept-Language")
+		//
+		//if c.Request.Method == "OPTIONS" {
+		//	c.AbortWithStatus(204)
+		//	return
+		//}
 
 		c.Request.Header.Del("Origin")
 
@@ -84,19 +84,15 @@ func Run(orm *orm.ORM) {
 		}
 	})
 
-	server.OnEvent("/", "kek", func(s socketio.Conn, msg string) error {
-
-		user := auth.ForWssContext(s)
-
-		s.Emit("reply", utils.WrapJSON(user))
-		return nil
-	})
-
 	server.OnEvent("/", "create-game", func(s socketio.Conn, msg string) error {
 
 		fmt.Println("CREAT EVENT")
 
 		user := auth.ForWssContext(s)
+
+		if user == nil {
+			return nil
+		}
 
 		activeGame := games.CreateStickerGame(user)
 
@@ -114,6 +110,10 @@ func Run(orm *orm.ORM) {
 		fmt.Println("JOIN")
 
 		user := auth.ForWssContext(s)
+
+		if user == nil {
+			return nil
+		}
 
 		activeGame := games.JoinStickerGame(user, msg)
 
@@ -136,6 +136,10 @@ func Run(orm *orm.ORM) {
 
 		user := auth.ForWssContext(s)
 
+		if user == nil {
+			return nil
+		}
+
 		activeGame := games.StartStickerGame(user, msg)
 
 		server.BroadcastToRoom("/", activeGame.Id.String(), "game-prepared", utils.WrapJSON(activeGame))
@@ -151,6 +155,10 @@ func Run(orm *orm.ORM) {
 
 		user := auth.ForWssContext(s)
 
+		if user == nil {
+			return nil
+		}
+
 		activeGame := games.RestartStickerGame(user, msg)
 
 		server.BroadcastToRoom("/", activeGame.Id.String(), "game-restarted", utils.WrapJSON(activeGame))
@@ -165,6 +173,10 @@ func Run(orm *orm.ORM) {
 		fmt.Println("SET WORD")
 
 		user := auth.ForWssContext(s)
+
+		if user == nil {
+			return nil
+		}
 
 		setWord := games.SetWord{}
 
@@ -187,6 +199,10 @@ func Run(orm *orm.ORM) {
 
 		user := auth.ForWssContext(s)
 
+		if user == nil {
+			return nil
+		}
+
 		activeGame := games.GotWordInGame(user, msg, server)
 
 		server.BroadcastToRoom("/", activeGame.Id.String(), "game-updated", utils.WrapJSON(activeGame))
@@ -202,6 +218,10 @@ func Run(orm *orm.ORM) {
 
 		user := auth.ForWssContext(s)
 
+		if user == nil {
+			return nil
+		}
+
 		s.Leave(msg)
 
 		games.LeaveFromStickerGame(user, msg, server)
@@ -213,10 +233,12 @@ func Run(orm *orm.ORM) {
 	defer server.Close()
 
 	r.Use(cors.New(cors.Config{
-		AllowMethods:     []string{"GET", "POST", "WS"},
+		AllowMethods:     []string{"GET", "POST", "WS", "WSS"},
 		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Vk-Params", "Origin", "Host", "Connection", "Accept-Encoding", "Accept-Language", "X-Requested-With"},
 		AllowCredentials: true,
-		AllowOrigins:     []string{"*"},
+		AllowWebSockets:  true,
+		AllowWildcard:    true,
+		AllowOrigins:     []string{"https://*.vk-apps.com"},
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -246,10 +268,10 @@ func Run(orm *orm.ORM) {
 	{
 		ws.Handle("POST", "/*any", gin.WrapH(server))
 		ws.Handle("GET", "/*any", gin.WrapH(server))
+		ws.Handle("OPTIONS", "/*any", gin.WrapH(server))
+		ws.Handle("WS", "/*any", gin.WrapH(server))
+		ws.Handle("WSS", "/*any", gin.WrapH(server))
 	}
-
-	//r.Handle ( "WS", "/socket.io/*any", gin.WrapH(server) )
-	//r.Handle ( "WSS", "/socket.io/*any", gin.WrapH(server) )
 
 	log.Info("Running @ http://" + host + ":" + port)
 	log.Info(r.Run(host + ":" + port))
