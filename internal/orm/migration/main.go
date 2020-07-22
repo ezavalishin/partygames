@@ -13,6 +13,7 @@ func updateMigration(db *gorm.DB) error {
 		&models.User{},
 		&models.Word{},
 		&models.Tag{},
+		&models.ErrorLog{},
 	).Error
 
 	return err

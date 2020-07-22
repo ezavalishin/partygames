@@ -251,6 +251,7 @@ func Run(orm *orm.ORM) {
 		authorized.GET("/me", handlers.CurrentUser(orm))
 		authorized.GET("/alias/words", handlers.AliasWords(orm))
 		authorized.GET("/stickers/word", handlers.GetRandomStickerWord(orm))
+		authorized.POST("/error-log", handlers.StoreErrorLog(orm))
 	}
 
 	adminized := r.Group("/admin")
